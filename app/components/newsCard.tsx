@@ -10,9 +10,9 @@ type OpportunityType = "project" | "hackathon" | "job";
 type Post = {
   id: string;
   author: string;
-  headline: string;
+  title: string;
   content: string;
-  kind: PostKind;
+  type: FeedType;
   createdAt: string;
   likes: number;
   comments: number;
@@ -25,24 +25,20 @@ type Post = {
 const starterPosts: Post[] = [
   {
     id: "seed-1",
-    author: "Chemical Engineering, IIT Madras",
-    headline: "1d",
+    author: "SDC Community Team",
+    title: "BuildSprint registration open",
     content:
-      "Department of Chemical Engineering welcomes Dr. Hariprasad Kodamana for a colloquium on resource-aware control in AI systems. Everyone is invited.",
-    kind: "Article",
+      "Hackathon applications are live for BuildSprint. Teams of 2-4 can register before Friday midnight.",
+    type: "hackathon",
     createdAt: "1d",
-    likes: 42,
-    comments: 9,
-    reposts: 5,
-    attachmentTitle: "Chemical Engineering Colloquium - Event Flyer",
   },
   {
     id: "seed-2",
-    author: "SDC Community Team",
-    headline: "3h",
+    author: "Career Cell",
+    title: "Frontend internship drive",
     content:
-      "Hackathon opportunity is live. Looking for frontend engineers, backend engineers, and designers. Drop a comment with your stack.",
-    kind: "Post",
+      "Job openings available for React and Next.js developers. Shortlisted candidates will get interviews this week.",
+    type: "job",
     createdAt: "3h",
     likes: 21,
     comments: 14,

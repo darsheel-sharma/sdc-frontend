@@ -1,5 +1,6 @@
 import Navbar from "@/app/components/navbar";
 import NewsCard from "@/app/components/newsCard";
+import SearchBar from "@/app/components/searchBar";
 
 export default function Home() {
   return (
