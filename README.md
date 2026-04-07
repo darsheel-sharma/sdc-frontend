@@ -1,4 +1,4 @@
-BuildSpace Frontend page.
+BuildSpace Frontend page :-)
 
 This project is a Next.js frontend for BuildSpace.
 It includes:
