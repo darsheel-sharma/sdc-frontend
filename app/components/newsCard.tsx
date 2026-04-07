@@ -46,77 +46,10 @@ const starterPosts: Post[] = [
 ];
 
 export default function NewsCard() {
-  const [posts, setPosts] = useState<Post[]>(starterPosts);
-  const [postText, setPostText] = useState("");
-  const [kind, setKind] = useState<PostKind>("Post");
-
-  const createPost = () => {
-    const trimmed = postText.trim();
-
-    if (!trimmed) {
-      return;
-    }
-
-    const newPost: Post = {
-      id: `post-${Date.now()}`,
-      author: "You",
-      headline: "now",
-      content: trimmed,
-      kind,
-      createdAt: "now",
-      likes: 0,
-      comments: 0,
-      reposts: 0,
-    };
-
-    setPosts((prev) => [newPost, ...prev]);
-    setPostText("");
-    setKind("Post");
-  };
+  const [posts] = useState<Post[]>(starterPosts);
 
   return (
     <section className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
-      <div className="mb-5 rounded-xl border border-[#1c1b20]/10 bg-white p-4 shadow-sm">
-        <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#1c1b20] text-sm font-bold text-white">
-            You
-          </div>
-          <div className="w-full">
-            <textarea
-              value={postText}
-              onChange={(e) => setPostText(e.target.value)}
-              placeholder="Start a post..."
-              className="h-24 w-full resize-none rounded-3xl border border-[#1c1b20]/20 bg-[#f7f5f3] px-4 py-3 text-sm text-[#1c1b20] outline-none focus:border-[#1c1b20]/40"
-            />
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {(["Post", "Video", "Photo", "Article"] as PostKind[]).map(
-                (option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => setKind(option)}
-                    className={`rounded-md px-3 py-2 text-sm font-semibold transition ${
-                      kind === option
-                        ? "bg-[#1c1b20] text-white"
-                        : "bg-[#f2f0ef] text-[#1c1b20] hover:bg-[#e8e4e2]"
-                    }`}
-                  >
-                    {option}
-                  </button>
-                ),
-              )}
-              <button
-                type="button"
-                onClick={createPost}
-                className="ml-auto rounded-full bg-[#1c1b20] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2b2a32]"
-              >
-                Post
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="mb-3 border-t border-[#1c1b20]/10 pt-2 text-right text-xs font-semibold text-[#1c1b20]/60">
         Sort by: Top
       </div>

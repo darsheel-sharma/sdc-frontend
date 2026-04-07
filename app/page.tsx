@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { GoogleLogin, type CredentialResponse } from "@react-oauth/google";
-import { isLocalDevAuthBypassEnabled } from "@/app/lib/isLocalDevAuthBypass";
+import { getApiBaseUrl } from "@/app/lib/apiBaseUrl";
+import { extractToken, extractUser, extractUserFromToken, parseApiBody } from "@/app/lib/authResponse";
 
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
@@ -17,15 +18,15 @@ export default function Login() {
   const [googleLoading, setGoogleLoading] = useState(false);
 
   const router = useRouter();
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const apiUrl = getApiBaseUrl();
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-  const bypassAuth = isLocalDevAuthBypassEnabled();
 
   useEffect(() => {
-    if (bypassAuth) {
+    const token = localStorage.getItem("token");
+    if (token) {
       router.replace("/home");
     }
-  }, [bypassAuth, router]);
+  }, [router]);
 
   const toggleMode = () => {
     setIsLogin((prev) => !prev);
@@ -42,22 +43,30 @@ export default function Login() {
     const endpoint = isLogin ? "/login" : "/register";
 
     try {
-      if (!apiUrl) {
-        throw new Error("NEXT_PUBLIC_API_URL is not configured.");
-      }
-
       const res = await fetch(`${apiUrl}/auth${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
-      const data = await res.json();
+      const data = await parseApiBody(res);
+      const token = extractToken(data);
+      const user = extractUser(data) ?? (token ? extractUserFromToken(token) : null);
 
-      if (res.ok && data.token) {
-        localStorage.setItem("token", data.token);
+      if (res.ok && token) {
+        localStorage.setItem("token", token);
+        if (user) {
+          localStorage.setItem("auth-user", JSON.stringify(user));
+        }
         router.push("/home");
       } else {
-        alert(data.error || "Authentication Failed");
+        const message =
+          (typeof data === "object" &&
+            data &&
+            "error" in data &&
+            typeof (data as { error: unknown }).error === "string" &&
+            (data as { error: string }).error) ||
+          "Authentication Failed";
+        alert(message);
       }
     } catch (err) {
       console.error(err);
@@ -76,24 +85,36 @@ export default function Login() {
     }
 
     try {
-      if (!apiUrl) {
-        throw new Error("NEXT_PUBLIC_API_URL is not configured.");
-      }
-
       setGoogleLoading(true);
 
       const res = await fetch(`${apiUrl}/auth/google-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken: credentialResponse.credential }),
+        body: JSON.stringify({
+          idToken: credentialResponse.credential,
+          credential: credentialResponse.credential,
+          token: credentialResponse.credential,
+        }),
       });
-      const data = await res.json();
+      const data = await parseApiBody(res);
+      const token = extractToken(data);
+      const user = extractUser(data) ?? (token ? extractUserFromToken(token) : null);
 
-      if (res.ok && data.token) {
-        localStorage.setItem("token", data.token);
+      if (res.ok && token) {
+        localStorage.setItem("token", token);
+        if (user) {
+          localStorage.setItem("auth-user", JSON.stringify(user));
+        }
         router.push("/home");
       } else {
-        alert(data.error || "Google login failed");
+        const message =
+          (typeof data === "object" &&
+            data &&
+            "error" in data &&
+            typeof (data as { error: unknown }).error === "string" &&
+            (data as { error: string }).error) ||
+          "Google login failed";
+        alert(message);
       }
     } catch (err) {
       console.error(err);
