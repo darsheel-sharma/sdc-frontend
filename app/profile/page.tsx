@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Navbar from "@/app/components/navbar";
 import { getApiBaseUrl } from "@/app/lib/apiBaseUrl";
+import { readCreatedItems, saveCreatedItem } from "@/app/lib/createdItems";
+import { readJoinedItems } from "@/app/lib/joinedItems";
 import {
   extractUser,
   extractUserFromToken,
@@ -219,11 +222,25 @@ function normalizeItems(list: unknown[], fallbackPrefix: string) {
 }
 
 function createCollectionItem(key: CollectionKey, title: string, description: string): CollectionItem {
+  // Local item ids are enough here because these create flows are still client-first :-)
   return {
     id: `${key}-${Date.now()}`,
     title,
     description,
   };
+}
+
+function mergeUniqueItems(primary: CollectionItem[], secondary: CollectionItem[]) {
+  const seen = new Set<string>();
+  const merged: CollectionItem[] = [];
+
+  for (const item of [...primary, ...secondary]) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    merged.push(item);
+  }
+
+  return merged;
 }
 
 function lowerSet(values: Array<string | undefined>) {
@@ -320,6 +337,7 @@ function buildProfile(data: unknown, fallbackUser: AuthUser | null): ProfileData
   const authUser = extractUser(data) ?? fallbackUser;
   const userSource = asRecord(source);
 
+  // We normalize generously because the backend payload can evolve over time.
   const name =
     firstString(
       userSource?.name,
@@ -414,11 +432,13 @@ function buildProfile(data: unknown, fallbackUser: AuthUser | null): ProfileData
 
 function EmptyCollectionCard({
   title,
+  actionLabel,
   hint,
   onAction,
   canAdd,
 }: {
   title: string;
+  actionLabel: string;
   hint: string;
   onAction: () => void;
   canAdd: boolean;
@@ -433,6 +453,13 @@ function EmptyCollectionCard({
           No {title.toLowerCase()} yet
         </h4>
         <p className="mt-1 text-sm text-[#1c1b20]/65">{hint}</p>
+        <button
+          type="button"
+          onClick={onAction}
+          className="mt-4 rounded-lg bg-[#1c1b20] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2b2a32]"
+        >
+          {actionLabel}
+        </button>
       </div>
     );
   }
@@ -456,6 +483,7 @@ function CollectionCard({
   meta,
   title,
   items,
+  emptyLabel,
   emptyHint,
   onAdd,
   canAdd,
@@ -463,6 +491,7 @@ function CollectionCard({
   meta: SectionMeta;
   title: string;
   items: CollectionItem[];
+  emptyLabel: string;
   emptyHint: string;
   onAdd: (key: CollectionKey) => void;
   canAdd: boolean;
@@ -501,6 +530,7 @@ function CollectionCard({
         ) : (
           <EmptyCollectionCard
             title={title}
+            actionLabel={emptyLabel}
             hint={emptyHint}
             onAction={() => onAdd(meta.key)}
             canAdd={canAdd}
@@ -512,6 +542,7 @@ function CollectionCard({
 }
 
 export default function AccountPage() {
+  const router = useRouter();
   const [profile, setProfile] = useState<ProfileData>(emptyProfile);
   const [loading, setLoading] = useState(true);
   const [activeAddSection, setActiveAddSection] = useState<SectionMeta | null>(null);
@@ -537,6 +568,7 @@ export default function AccountPage() {
       const fallbackUser = storedUser ?? (token ? extractUserFromToken(token) : null);
 
       if (!token) {
+        // Even without a token we try to show the soft cached identity if it exists.
         setProfile((prev) => ({
           ...prev,
           name: fallbackUser?.name ?? emptyProfile.name,
@@ -557,12 +589,59 @@ export default function AccountPage() {
         const data = await parseApiBody(res);
 
         if (res.ok) {
-          setProfile(buildProfile(data, fallbackUser));
+          const backendProfile = buildProfile(data, fallbackUser);
+          const joinedFromHome = readJoinedItems();
+          const createdFromProfile = readCreatedItems();
+
+          // Backend profile data is treated as the source of truth,
+          // then we layer in local create/join actions for instant feedback.
+          setProfile({
+            ...backendProfile,
+            joinedProjects: mergeUniqueItems(
+              backendProfile.joinedProjects,
+              joinedFromHome.joinedProjects,
+            ),
+            joinedHackathons: mergeUniqueItems(
+              backendProfile.joinedHackathons,
+              joinedFromHome.joinedHackathons,
+            ),
+            joinedJobs: mergeUniqueItems(
+              backendProfile.joinedJobs,
+              joinedFromHome.joinedJobs,
+            ),
+            createdProjects: mergeUniqueItems(
+              backendProfile.createdProjects,
+              createdFromProfile.createdProjects,
+            ),
+            createdHackathons: mergeUniqueItems(
+              backendProfile.createdHackathons,
+              createdFromProfile.createdHackathons,
+            ),
+            createdJobs: mergeUniqueItems(
+              backendProfile.createdJobs,
+              createdFromProfile.createdJobs,
+            ),
+          });
         } else {
           setProfile((prev) => ({
             ...prev,
             name: fallbackUser?.name ?? prev.name,
             email: fallbackUser?.email ?? prev.email,
+            joinedProjects: mergeUniqueItems(prev.joinedProjects, readJoinedItems().joinedProjects),
+            joinedHackathons: mergeUniqueItems(
+              prev.joinedHackathons,
+              readJoinedItems().joinedHackathons,
+            ),
+            joinedJobs: mergeUniqueItems(prev.joinedJobs, readJoinedItems().joinedJobs),
+            createdProjects: mergeUniqueItems(
+              prev.createdProjects,
+              readCreatedItems().createdProjects,
+            ),
+            createdHackathons: mergeUniqueItems(
+              prev.createdHackathons,
+              readCreatedItems().createdHackathons,
+            ),
+            createdJobs: mergeUniqueItems(prev.createdJobs, readCreatedItems().createdJobs),
           }));
         }
       } catch (error) {
@@ -571,6 +650,21 @@ export default function AccountPage() {
           ...prev,
           name: fallbackUser?.name ?? prev.name,
           email: fallbackUser?.email ?? prev.email,
+          joinedProjects: mergeUniqueItems(prev.joinedProjects, readJoinedItems().joinedProjects),
+          joinedHackathons: mergeUniqueItems(
+            prev.joinedHackathons,
+            readJoinedItems().joinedHackathons,
+          ),
+          joinedJobs: mergeUniqueItems(prev.joinedJobs, readJoinedItems().joinedJobs),
+          createdProjects: mergeUniqueItems(
+            prev.createdProjects,
+            readCreatedItems().createdProjects,
+          ),
+          createdHackathons: mergeUniqueItems(
+            prev.createdHackathons,
+            readCreatedItems().createdHackathons,
+          ),
+          createdJobs: mergeUniqueItems(prev.createdJobs, readCreatedItems().createdJobs),
         }));
       } finally {
         setLoading(false);
@@ -608,6 +702,13 @@ export default function AccountPage() {
   );
 
   const openAddModal = (key: CollectionKey) => {
+    const isJoinedSection = key.startsWith("joined");
+    if (isJoinedSection) {
+      // Joined items should be requested from Home, not created from Profile.
+      router.push("/home");
+      return;
+    }
+
     const section = profileSections.find((item) => item.key === key) ?? null;
     setActiveAddSection(section);
     setDraftTitle("");
@@ -629,6 +730,19 @@ export default function AccountPage() {
     if (!title || !description) return;
 
     const newItem = createCollectionItem(activeAddSection.key, title, description);
+    if (
+      activeAddSection.key === "createdProjects" ||
+      activeAddSection.key === "createdHackathons" ||
+      activeAddSection.key === "createdJobs"
+    ) {
+      // Created opportunities are also pushed into a shared local store
+      // so they appear on the home feed immediately.
+      saveCreatedItem(activeAddSection.key, {
+        ...newItem,
+        author: profile.name,
+      });
+    }
+
     setProfile((prev) => ({
       ...prev,
       [activeAddSection.key]: [newItem, ...prev[activeAddSection.key]],
@@ -650,6 +764,7 @@ export default function AccountPage() {
     const nextBio = draftBio.trim();
     if (!nextBio) return;
 
+    // Local bio editing keeps the account page pleasant while backend save is still pending :-)
     setProfile((prev) => ({
       ...prev,
       bio: nextBio,
@@ -781,6 +896,7 @@ export default function AccountPage() {
                 meta={section}
                 title={section.title}
                 items={profile[section.key]}
+                emptyLabel={section.emptyLabel}
                 emptyHint={section.emptyHint}
                 onAdd={openAddModal}
                 canAdd={false}
@@ -804,6 +920,7 @@ export default function AccountPage() {
                 meta={section}
                 title={section.title}
                 items={profile[section.key]}
+                emptyLabel={section.emptyLabel}
                 emptyHint={section.emptyHint}
                 onAdd={openAddModal}
                 canAdd={true}

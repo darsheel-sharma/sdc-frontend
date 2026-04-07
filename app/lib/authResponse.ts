@@ -27,6 +27,7 @@ function firstString(...values: unknown[]) {
 function extractUserFromRecord(record: UnknownRecord | null): AuthUser | null {
   if (!record) return null;
 
+  // We only keep the fields the frontend actually uses to stay nice and small :-)
   const user: AuthUser = {
     id: firstString(record.id, record._id, record.userId, record.sub),
     name: firstString(
@@ -57,6 +58,8 @@ export function extractToken(value: unknown): string | null {
   const root = asRecord(value);
   if (!root) return null;
 
+  // Different auth endpoints can nest the token under different keys,
+  // so we check the common direct and wrapped variants.
   const directCandidates = [
     root.token,
     root.accessToken,
@@ -93,6 +96,8 @@ export function extractUser(value: unknown): AuthUser | null {
   const root = asRecord(value);
   if (!root) return null;
 
+  // The backend user payload may arrive as user/profile/data/result,
+  // so we walk through the common containers and normalize once.
   const candidates = [
     asRecord(root.user),
     asRecord(root.profile),
@@ -121,6 +126,7 @@ export function extractUserFromToken(token: string): AuthUser | null {
   if (parts.length < 2 || typeof window === "undefined") return null;
 
   try {
+    // Client-side JWT decoding is just a convenience fallback, not a trust boundary.
     const payload = parts[1]
       .replace(/-/g, "+")
       .replace(/_/g, "/")
@@ -141,6 +147,7 @@ export async function parseApiBody(res: Response) {
   try {
     return JSON.parse(text) as unknown;
   } catch {
+    // Some backend errors arrive as plain text, so we wrap them into an object.
     return { message: text } as UnknownRecord;
   }
 }

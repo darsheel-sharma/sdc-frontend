@@ -19,6 +19,7 @@ export default function Navbar() {
 
   useEffect(() => {
     const readStoredUser = () => {
+      // The cached user lets us paint the navbar instantly before fetch completes.
       const storedUser = localStorage.getItem("auth-user");
       if (!storedUser) return null;
 
@@ -33,12 +34,15 @@ export default function Navbar() {
     const fetchUser = async () => {
       const token = localStorage.getItem("token");
       const storedUser = readStoredUser();
+      // We keep a local fallback user so temporary backend issues do not
+      // immediately bounce the user back to the login screen.
       const fallbackUser =
         storedUser ?? (token ? extractUserFromToken(token) : null);
 
       if (storedUser) {
         setUser(storedUser);
       } else if (token) {
+        // Decode lightweight user info from the JWT when we do not have cached profile data.
         const tokenUser = extractUserFromToken(token);
         if (tokenUser) {
           setUser(tokenUser);
@@ -62,10 +66,12 @@ export default function Navbar() {
             "Content-Type": "application/json",
           },
         });
+        // Refresh the cached user whenever the backend gives us a usable payload.
         const data = await parseApiBody(res);
         const parsedUser = extractUser(data) ?? extractUserFromToken(token);
 
         if (res.ok && parsedUser) {
+          // Fresh backend user wins over cached data every time.
           setUser(parsedUser);
           localStorage.setItem("auth-user", JSON.stringify(parsedUser));
         } else if (res.status === 401 || res.status === 403) {
@@ -98,10 +104,12 @@ export default function Navbar() {
   }, [pathname]);
 
   const goToAccountOrHome = () => {
+    // One toggle button keeps mobile/desktop navigation simple :-)
     router.push(pathname === "/profile" ? "/home" : "/profile");
   };
 
   const handleLogout = () => {
+    // Clear both token and cached profile so the next visit starts fresh.
     localStorage.removeItem("token");
     localStorage.removeItem("auth-user");
     router.push("/");
@@ -114,7 +122,6 @@ export default function Navbar() {
 
         <div className="hidden text-lg text-white md:block">
           {loading ? "Loading..." : `Welcome, ${user?.name || "User"}`} 
-          {/* so here we will put the user if user name is not available */}
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
