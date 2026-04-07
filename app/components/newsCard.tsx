@@ -115,71 +115,12 @@ const mapOpportunityToFeedItem = (
 });
 
 export default function NewsCard() {
-  const searchParams = useSearchParams();
-
-  const [posts, setPosts] = useState<FeedItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [joinedMap, setJoinedMap] = useState<Record<string, boolean>>({});
-
-  const activeFilter = normalizeFilter(searchParams.get("type"));
-
-  useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-
-    if (!apiUrl) {
-      setPosts(starterPosts);
-      return;
-    }
-
-    const loadPosts = async () => {
-      setLoading(true);
-
-      try {
-        const query = activeFilter === "all" ? "" : `?type=${activeFilter}`;
-        const res = await fetch(`${apiUrl}/opportunities${query}`, {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-        });
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.error || "Failed to load feed");
-        }
-
-        const opportunities = Array.isArray(data.opportunities)
-          ? data.opportunities
-          : [];
-        const mapped = opportunities.map(mapOpportunityToFeedItem);
-        setPosts(mapped);
-      } catch {
-        setPosts([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadPosts();
-  }, [activeFilter]);
-
-  const filteredPosts = useMemo(() => {
-    if (activeFilter === "all") {
-      return posts;
-    }
-
-    return posts.filter((post) => post.type === activeFilter);
-  }, [posts, activeFilter]);
-
-  const handleJoinOpportunity = (postId: string) => {
-    setJoinedMap((prev) => ({ ...prev, [postId]: true }));
-  };
+  const [posts] = useState<Post[]>(starterPosts);
 
   return (
     <section className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#1c1b20]/10 pt-2 text-xs font-semibold text-[#1c1b20]/60">
-        <p>
-          Viewing: {activeFilter === "all" ? "All" : FEED_TYPE_LABELS[activeFilter]}
-        </p>
-        <p>{loading ? "Refreshing..." : `${filteredPosts.length} items`}</p>
+      <div className="mb-3 border-t border-[#1c1b20]/10 pt-2 text-right text-xs font-semibold text-[#1c1b20]/60">
+        Sort by: Top
       </div>
 
       <div className="space-y-4">
