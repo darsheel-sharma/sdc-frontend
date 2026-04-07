@@ -1,49 +1,118 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import {
+  FEED_TYPES,
+  FEED_TYPE_LABELS,
+  type FeedFilter,
+  type FeedType,
+} from "@/app/lib/feedTypes";
 
-type PostKind = "Post" | "Video" | "Photo" | "Article";
-
-type Post = {
+type FeedItem = {
   id: string;
   author: string;
-  headline: string;
+  title: string;
   content: string;
-  kind: PostKind;
+  type: FeedType;
   createdAt: string;
-  likes: number;
-  comments: number;
-  reposts: number;
-  attachmentTitle?: string;
 };
 
-const starterPosts: Post[] = [
+type OpportunityResponseItem = {
+  _id?: string;
+  id?: string;
+  title?: string;
+  desc?: string;
+  description?: string;
+  type?: string;
+  createdAt?: string;
+  postedBy?: {
+    name?: string;
+  };
+};
+
+const starterPosts: FeedItem[] = [
   {
     id: "seed-1",
-    author: "Chemical Engineering, IIT Madras",
-    headline: "1d",
+    author: "SDC Community Team",
+    title: "BuildSprint registration open",
     content:
-      "Department of Chemical Engineering welcomes Dr. Hariprasad Kodamana for a colloquium on resource-aware control in AI systems. Everyone is invited.",
-    kind: "Article",
+      "Hackathon applications are live for BuildSprint. Teams of 2-4 can register before Friday midnight.",
+    type: "hackathon",
     createdAt: "1d",
-    likes: 42,
-    comments: 9,
-    reposts: 5,
-    attachmentTitle: "Chemical Engineering Colloquium - Event Flyer",
   },
   {
     id: "seed-2",
-    author: "SDC Community Team",
-    headline: "3h",
+    author: "Career Cell",
+    title: "Frontend internship drive",
     content:
-      "Hackathon opportunity is live. Looking for frontend engineers, backend engineers, and designers. Drop a comment with your stack.",
-    kind: "Post",
+      "Job openings available for React and Next.js developers. Shortlisted candidates will get interviews this week.",
+    type: "job",
     createdAt: "3h",
-    likes: 21,
-    comments: 14,
-    reposts: 2,
+  },
+  {
+    id: "seed-3",
+    author: "Project Board",
+    title: "Need teammate for AI summarizer",
+    content:
+      "Project team is looking for one frontend and one backend contributor for the AI summarizer MVP.",
+    type: "project",
+    createdAt: "30m",
   },
 ];
+
+const normalizeType = (value?: string): FeedType => {
+  const normalized = value?.trim().toLowerCase();
+
+  if (normalized && FEED_TYPES.includes(normalized as FeedType)) {
+    return normalized as FeedType;
+  }
+
+  return "project";
+};
+
+const normalizeFilter = (value: string | null): FeedFilter => {
+  if (!value) {
+    return "all";
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (FEED_TYPES.includes(normalized as FeedType)) {
+    return normalized as FeedType;
+  }
+
+  return "all";
+};
+
+const formatCreatedAt = (value?: string) => {
+  if (!value) {
+    return "now";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+};
+
+const mapOpportunityToFeedItem = (
+  item: OpportunityResponseItem,
+  index: number,
+): FeedItem => ({
+  id: item._id || item.id || `api-${index}`,
+  author: item.postedBy?.name || "Community",
+  title: item.title || "Untitled",
+  content: item.desc || item.description || "",
+  type: normalizeType(item.type),
+  createdAt: formatCreatedAt(item.createdAt),
+});
 
 export default function NewsCard() {
   const [posts] = useState<Post[]>(starterPosts);
@@ -55,7 +124,7 @@ export default function NewsCard() {
       </div>
 
       <div className="space-y-4">
-        {posts.map((post) => (
+        {filteredPosts.map((post) => (
           <article
             key={post.id}
             className="rounded-xl border border-[#1c1b20]/10 bg-white p-4 shadow-sm"
@@ -68,7 +137,7 @@ export default function NewsCard() {
                 <div>
                   <p className="text-base font-semibold text-[#1c1b20]">{post.author}</p>
                   <p className="text-xs text-[#1c1b20]/60">
-                    {post.createdAt} • {post.kind}
+                    {post.createdAt} • {FEED_TYPE_LABELS[post.type]}
                   </p>
                 </div>
               </div>
@@ -80,31 +149,43 @@ export default function NewsCard() {
               </button>
             </div>
 
+            <h3 className="mt-3 text-base font-bold text-[#1c1b20]">{post.title}</h3>
+
             <p className="mt-3 text-sm leading-relaxed text-[#1c1b20]/85">{post.content}</p>
 
-            {post.attachmentTitle ? (
-              <div className="mt-3 rounded-lg border border-[#1c1b20]/15 bg-[#f3f1ef] p-3 text-sm font-medium text-[#1c1b20]/80">
-                {post.attachmentTitle}
-              </div>
-            ) : null}
+            <span className="mt-3 inline-flex rounded-full bg-[#f2f0ef] px-3 py-1 text-xs font-semibold text-[#1c1b20]/80">
+              {FEED_TYPE_LABELS[post.type]}
+            </span>
 
-            <div className="mt-4 border-t border-[#1c1b20]/10 pt-3 text-xs text-[#1c1b20]/60">
-              {post.likes} likes • {post.comments} comments • {post.reposts} reposts
-            </div>
-
-            <div className="mt-2 grid grid-cols-4 gap-2">
-              {["Like", "Comment", "Repost", "Send"].map((action) => (
-                <button
-                  key={`${post.id}-${action}`}
-                  type="button"
-                  className="rounded-md py-2 text-sm font-semibold text-[#1c1b20]/75 transition hover:bg-[#f2f0ef]"
-                >
-                  {action}
-                </button>
-              ))}
+            <div className="mt-4 flex items-center justify-between border-t border-[#1c1b20]/10 pt-3">
+              <p className="text-xs font-semibold text-[#1c1b20]/60">
+                {post.type === "job" ? "Open role" : "Open team slots"}
+              </p>
+              <button
+                type="button"
+                onClick={() => handleJoinOpportunity(post.id)}
+                disabled={Boolean(joinedMap[post.id])}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  joinedMap[post.id]
+                    ? "cursor-not-allowed bg-[#e9f8ee] text-[#1e7a3e]"
+                    : "bg-[#1c1b20] text-white hover:bg-[#2b2a32]"
+                }`}
+              >
+                {joinedMap[post.id]
+                  ? post.type === "hackathon"
+                    ? "Joined!"
+                    : "Applied!"
+                  : "Join Opportunity"}
+              </button>
             </div>
           </article>
         ))}
+
+        {!loading && filteredPosts.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-[#1c1b20]/20 bg-white p-8 text-center text-sm text-[#1c1b20]/70">
+            No items found for this filter yet.
+          </div>
+        ) : null}
       </div>
     </section>
   );
