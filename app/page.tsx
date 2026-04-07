@@ -22,6 +22,7 @@ export default function Login() {
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
   useEffect(() => {
+    // Skip the auth screen if we already have a session token :-)
     const token = localStorage.getItem("token");
     if (token) {
       router.replace("/home");
@@ -33,6 +34,7 @@ export default function Login() {
   };
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    // Keep the form controlled so login/register share the same state object.
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -48,11 +50,14 @@ export default function Login() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
+      // The backend does not always return a single stable auth shape,
+      // so we normalize both the token and user before storing them.
       const data = await parseApiBody(res);
       const token = extractToken(data);
       const user = extractUser(data) ?? (token ? extractUserFromToken(token) : null);
 
       if (res.ok && token) {
+        // Store both pieces of auth state so the navbar/profile can hydrate fast.
         localStorage.setItem("token", token);
         if (user) {
           localStorage.setItem("auth-user", JSON.stringify(user));
@@ -96,11 +101,14 @@ export default function Login() {
           token: credentialResponse.credential,
         }),
       });
+      // Google login is handled by the same storage path as email/password
+      // so the rest of the app can read a single auth source.
       const data = await parseApiBody(res);
       const token = extractToken(data);
       const user = extractUser(data) ?? (token ? extractUserFromToken(token) : null);
 
       if (res.ok && token) {
+        // Same storage path as regular login = fewer edge cases later :-)
         localStorage.setItem("token", token);
         if (user) {
           localStorage.setItem("auth-user", JSON.stringify(user));
@@ -128,9 +136,9 @@ export default function Login() {
     <div className="flex min-h-screen bg-[#F2F0EF]">
       <div className="hidden lg:flex lg:w-1/2 bg-[#1c1b20] items-center justify-center p-12 text-white">
         <div className="max-w-lg">
-          <h1 className="text-5xl font-bold mb-6">Welcome to NovaNews</h1>
+          <h1 className="text-5xl font-bold mb-6">Welcome to BuildSpace</h1>
           <p className="text-lg text-gray-400">
-            A full-stack personalized news dashboard with AI-powered summaries.
+            A collaborative space to build projects, join hackathons, and discover opportunities.
           </p>
         </div>
       </div>
