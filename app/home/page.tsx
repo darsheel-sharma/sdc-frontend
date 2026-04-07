@@ -1,8 +1,11 @@
 import Navbar from "@/app/components/navbar";
+import NewsCard from "@/app/components/newsCard";
+
 export default function Home() {
   return (
-    <div className="bg-[#F2F0EF] min-h-screen text-[#1c1b20]">
+    <div className="min-h-screen bg-[#F2F0EF] text-[#1c1b20]">
       <Navbar />
+      <NewsCard />
     </div>
   );
 }

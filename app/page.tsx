@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { GoogleLogin, type CredentialResponse } from "@react-oauth/google";
+import { isLocalDevAuthBypassEnabled } from "@/app/lib/isLocalDevAuthBypass";
 
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
@@ -18,6 +19,13 @@ export default function Login() {
   const router = useRouter();
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  const bypassAuth = isLocalDevAuthBypassEnabled();
+
+  useEffect(() => {
+    if (bypassAuth) {
+      router.replace("/home");
+    }
+  }, [bypassAuth, router]);
 
   const toggleMode = () => {
     setIsLogin((prev) => !prev);

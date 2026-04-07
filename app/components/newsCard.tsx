@@ -1,210 +1,178 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { generateSummary } from "@/gemini";
+import { useState } from "react";
 
-interface User {
+type PostKind = "Post" | "Video" | "Photo" | "Article";
+
+type Post = {
   id: string;
-  name: string;
-  email?: string;
-}
+  author: string;
+  headline: string;
+  content: string;
+  kind: PostKind;
+  createdAt: string;
+  likes: number;
+  comments: number;
+  reposts: number;
+  attachmentTitle?: string;
+};
 
-interface Article {
-  source: {
-    id: string | null;
-    name: string;
-  };
-  title: string;
-  description: string | null;
-  content: string | null;
-  url: string;
-  urlToImage: string | null;
-}
+const starterPosts: Post[] = [
+  {
+    id: "seed-1",
+    author: "Chemical Engineering, IIT Madras",
+    headline: "1d",
+    content:
+      "Department of Chemical Engineering welcomes Dr. Hariprasad Kodamana for a colloquium on resource-aware control in AI systems. Everyone is invited.",
+    kind: "Article",
+    createdAt: "1d",
+    likes: 42,
+    comments: 9,
+    reposts: 5,
+    attachmentTitle: "Chemical Engineering Colloquium - Event Flyer",
+  },
+  {
+    id: "seed-2",
+    author: "SDC Community Team",
+    headline: "3h",
+    content:
+      "Hackathon opportunity is live. Looking for frontend engineers, backend engineers, and designers. Drop a comment with your stack.",
+    kind: "Post",
+    createdAt: "3h",
+    likes: 21,
+    comments: 14,
+    reposts: 2,
+  },
+];
 
-export default function NewsCard({ article }: { article: Article }) {
-  const [summary, setSummary] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">(
-    "idle",
-  );
+export default function NewsCard() {
+  const [posts, setPosts] = useState<Post[]>(starterPosts);
+  const [postText, setPostText] = useState("");
+  const [kind, setKind] = useState<PostKind>("Post");
 
-  const persistArticle = async (summaryToSave?: string | null) => {
-    if (!user?.id || loading) {
-      setSaveStatus("error");
-      return false;
+  const createPost = () => {
+    const trimmed = postText.trim();
+
+    if (!trimmed) {
+      return;
     }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-
-    if (!apiUrl) {
-      throw new Error("NEXT_PUBLIC_API_URL is not configured.");
-    }
-
-    const res = await fetch(`${apiUrl}/library/save-article`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: user.id,
-        article,
-        aiSummary: summaryToSave,
-      }),
-    });
-    const data = await res.json();
-
-    if (res.ok && data.success) {
-      setSaveStatus("saved");
-      return true;
-    }
-
-    setSaveStatus("error");
-    return false;
-  };
-
-  const handleSummary = async () => {
-    if (summary) return summary;
-
-    setIsLoading(true);
-
-    const result = await generateSummary(
-      article.title,
-      article.description,
-      article.content,
-    );
-
-    if (result.success) {
-      const nextSummary = result.summary || null;
-      setSummary(nextSummary);
-
-      if (saveStatus === "saved" && nextSummary) {
-        try {
-          await persistArticle(nextSummary);
-        } catch (err) {
-          console.error(err);
-        }
-      }
-    } else {
-      setSummary(result.error || null);
-    }
-
-    setIsLoading(false);
-  };
-
-  useEffect(() => {
-    setSummary(null);
-    setSaveStatus("idle");
-  }, [article.url]);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const token = localStorage.getItem("token");
-
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-
-        if (!apiUrl) {
-          throw new Error("NEXT_PUBLIC_API_URL is not configured.");
-        }
-
-        const res = await fetch(`${apiUrl}/auth/get-user`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-        const data = await res.json();
-
-        if (res.ok && data.user) {
-          setUser(data.user);
-        } else {
-          localStorage.removeItem("token");
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+    const newPost: Post = {
+      id: `post-${Date.now()}`,
+      author: "You",
+      headline: "now",
+      content: trimmed,
+      kind,
+      createdAt: "now",
+      likes: 0,
+      comments: 0,
+      reposts: 0,
     };
 
-    fetchUser();
-  }, []);
-
-  const handleSave = async () => {
-    setIsSaving(true);
-
-    try {
-      await persistArticle(summary);
-    } catch (err) {
-      console.error(err);
-      setSaveStatus("error");
-    } finally {
-      setIsSaving(false);
-    }
+    setPosts((prev) => [newPost, ...prev]);
+    setPostText("");
+    setKind("Post");
   };
 
   return (
-    <article className="relative bg-white rounded-xl p-5 shadow-sm border border-[#1c1b20]/10 flex flex-col">
-      <button
-        onClick={handleSave}
-        disabled={loading || isSaving || saveStatus === "saved"}
-        className="absolute top-7 right-7 bg-white/90 backdrop-blur px-3 py-2 rounded-full shadow-md hover:scale-105 transition disabled:opacity-50"
-        title={
-          saveStatus === "error" ? "Could not save article" : "Save article"
-        }
-      >
-        {isSaving ? "Saving..." : saveStatus === "saved" ? "Saved" : "Save"}
-      </button>
-
-      {article.urlToImage && (
-        <img
-          src={article.urlToImage}
-          alt={article.title}
-          className="w-full h-48 object-cover rounded-md mb-4"
-        />
-      )}
-
-      <h2 className="text-lg font-bold leading-tight mb-4">{article.title}</h2>
-
-      <div className="mb-6">
-        {!summary ? (
-          <button
-            onClick={handleSummary}
-            disabled={isLoading}
-            className="group inline-flex items-center gap-2 rounded-full border border-[#1c1b20]/10 bg-[#1c1b20] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(28,27,32,0.18)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(28,27,32,0.22)] disabled:translate-y-0 disabled:opacity-50 disabled:shadow-none"
-          >
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#f6c85f] transition group-hover:scale-110" />
-            {isLoading ? "Generating Overview..." : "AI Overview"}
-          </button>
-        ) : (
-          <div className="rounded-2xl border border-[#7da6c2]/25 bg-[linear-gradient(180deg,#f5f9fc_0%,#edf4f8_100%)] p-4 text-sm leading-relaxed text-[#20303b] shadow-sm">
-            <span className="font-bold block mb-1">AI Summary:</span>
-            {summary}
+    <section className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+      <div className="mb-5 rounded-xl border border-[#1c1b20]/10 bg-white p-4 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#1c1b20] text-sm font-bold text-white">
+            You
           </div>
-        )}
+          <div className="w-full">
+            <textarea
+              value={postText}
+              onChange={(e) => setPostText(e.target.value)}
+              placeholder="Start a post..."
+              className="h-24 w-full resize-none rounded-3xl border border-[#1c1b20]/20 bg-[#f7f5f3] px-4 py-3 text-sm text-[#1c1b20] outline-none focus:border-[#1c1b20]/40"
+            />
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {(["Post", "Video", "Photo", "Article"] as PostKind[]).map(
+                (option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setKind(option)}
+                    className={`rounded-md px-3 py-2 text-sm font-semibold transition ${
+                      kind === option
+                        ? "bg-[#1c1b20] text-white"
+                        : "bg-[#f2f0ef] text-[#1c1b20] hover:bg-[#e8e4e2]"
+                    }`}
+                  >
+                    {option}
+                  </button>
+                ),
+              )}
+              <button
+                type="button"
+                onClick={createPost}
+                className="ml-auto rounded-full bg-[#1c1b20] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2b2a32]"
+              >
+                Post
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="flex justify-between items-center mt-auto pt-4 border-t border-gray-100">
-        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-          {article.source.name}
-        </span>
-
-        <a
-          href={article.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sm font-semibold bg-[#1c1b20] text-white px-4 py-2 rounded-full hover:bg-gray-800 transition"
-        >
-          Read Full Article
-        </a>
+      <div className="mb-3 border-t border-[#1c1b20]/10 pt-2 text-right text-xs font-semibold text-[#1c1b20]/60">
+        Sort by: Top
       </div>
-    </article>
+
+      <div className="space-y-4">
+        {posts.map((post) => (
+          <article
+            key={post.id}
+            className="rounded-xl border border-[#1c1b20]/10 bg-white p-4 shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#efe8df] text-xs font-bold text-[#1c1b20]">
+                  {post.author.slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-base font-semibold text-[#1c1b20]">{post.author}</p>
+                  <p className="text-xs text-[#1c1b20]/60">
+                    {post.createdAt} • {post.kind}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="rounded-md px-2 py-1 text-sm text-[#1c1b20]/60 hover:bg-[#f2f0ef]"
+              >
+                ...
+              </button>
+            </div>
+
+            <p className="mt-3 text-sm leading-relaxed text-[#1c1b20]/85">{post.content}</p>
+
+            {post.attachmentTitle ? (
+              <div className="mt-3 rounded-lg border border-[#1c1b20]/15 bg-[#f3f1ef] p-3 text-sm font-medium text-[#1c1b20]/80">
+                {post.attachmentTitle}
+              </div>
+            ) : null}
+
+            <div className="mt-4 border-t border-[#1c1b20]/10 pt-3 text-xs text-[#1c1b20]/60">
+              {post.likes} likes • {post.comments} comments • {post.reposts} reposts
+            </div>
+
+            <div className="mt-2 grid grid-cols-4 gap-2">
+              {["Like", "Comment", "Repost", "Send"].map((action) => (
+                <button
+                  key={`${post.id}-${action}`}
+                  type="button"
+                  className="rounded-md py-2 text-sm font-semibold text-[#1c1b20]/75 transition hover:bg-[#f2f0ef]"
+                >
+                  {action}
+                </button>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { isLocalDevAuthBypassEnabled } from "@/app/lib/isLocalDevAuthBypass";
 
 interface User {
   name: string;
@@ -16,6 +17,12 @@ export default function Navbar() {
 
   useEffect(() => {
     const fetchUser = async () => {
+      if (isLocalDevAuthBypassEnabled()) {
+        setUser({ name: "Developer" });
+        setLoading(false);
+        return;
+      }
+
       const token = localStorage.getItem("token");
 
       if (!token) {
@@ -66,11 +73,16 @@ export default function Navbar() {
           onClick={() => router.push(pathname === "/library" ? "/home" : "/library")}
           className="px-4 py-2 bg-white text-black rounded-md hover:bg-gray-200"
         >
-          {pathname === "/library" ? "Home" : "Library"}
+          {pathname === "/library" ? "Home" : "My Account"}
         </button>
         <button
           onClick={() => {
             localStorage.removeItem("token");
+            if (isLocalDevAuthBypassEnabled()) {
+              router.push("/home");
+              return;
+            }
+
             router.push("/");
           }}
           className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
